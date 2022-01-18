@@ -1,0 +1,117 @@
+version: '3'
+
+env:
+  ROOT:                '{{.PWD}}'
+  KASPERPATH:          '{{.ROOT}}/..'
+  KERNEL:              '{{.KASPERPATH}}/kdfsan-linux'
+  MONGO_URI:           'mongodb://root:kasper123@localhost'
+  SYZKALLER_LOGS_PATH: 'out/logs'
+  LOGFILE:             'out/log'
+  POLICIES:            'out/policy-eval'
+  VMLINUX:             'out/latest/vmlinux'
+
+tasks:
+  setup:
+    desc: run this before the rest to setup virtualenv etc
+    cmds:
+        - virtualenv .env
+        - (source .env/bin/activate;
+           pip3 install -r requirements.txt)
+
+  collect-log:
+    desc: combine logs from all syzkaller vms into one log file
+    cmds:
+      - scripts/collect-logs.sh ${SYZKALLER_LOGS_PATH} out/log-old
+      - tr -dC '[:print:]\t\n' < out/log-old > {{.LOGFILE}}
+      - rm out/log-old
+
+  parse-log:
+    desc: parse log to generate reports.sqlite database for web server
+    cmds:
+      - (source .env/bin/activate;
+         scripts/parse-log.py --log {{.LOGFILE}})
+
+  add-faddr2line:
+    desc: add faddr2line information for func_offsets
+    cmds:
+      - (source .env/bin/activate;
+         scripts/add_faddr2line.py --sym {{.VMLINUX}})
+
+  eval:
+    desc: run evaluation scripts to generate necessary plots etc.
+    cmds:
+      - (source .env/bin/activate;
+         scripts/eval.py --nr-vms=16)
+
+  parse-restarts:
+    desc: parse a restart statistics log
+    cmds:
+      - (source .env/bin/activate;
+         scripts/parse-restart-statistics.py -s out/restart-stats/log)
+
+  restarts:
+    desc: generate speculative emulation restart statistics
+    cmds:
+      - mkdir -p out/restart-stats
+      - cd $KASPERPATH && task qemu:qemu -- --whitelist t --no-reports --restart-stats --restart-inlineasm-stats | tee {{.ROOT}}/out/restart-stats/log
+      - task: parse-restarts
+
+  parse-inlineasm-restarts:
+    desc: print line numbers of inline assembly restarts from a restart log
+    cmds:
+      - (source .env/bin/activate;
+         scripts/parse-inlineasm-restarts.sh out/restart-stats/log)
+
+  syzkaller-coverage:
+    desc: generate plot with increase of coverage over time compared to baseline
+    vars:
+      BASELINE: '{{default "out/eval-runs/syzkaller-log-vm-10-coverage-baseline" .BASELINE}}'
+      SPEC: '{{default "out/eval-runs/syzkaller-log-vm-10-coverage-spec" .SPEC}}'
+      NR_VMS: '{{default 16 .NR_VMS}}'
+    cmds:
+      - (source .env/bin/activate;
+         scripts/parse-syzkaller-bench.py --baseline {{.BASELINE}} --spec {{.SPEC}} --nr-vms={{.NR_VMS}})
+
+  export-reports:
+    desc: export reports as text file
+    cmds:
+      - (source .env/bin/activate;
+         scripts/export-reports.py)
+
+  # Policy Eval
+  policy:
+    desc: runs tests with kasper policies
+    vars:
+      TARGET: '{{default "syzkaller" .TARGET}}'
+      POLICY_TARGET: '{{default "kasper-phtsyscallcc" .POLICY_TARGET}}'
+      POLICY_CMD: '{{default "ls" .POLICY_CMD}}'
+    cmds:
+      - mkdir -p out/policy-eval
+      - cd $KASPERPATH && task qemu:qemu -- --target {{.TARGET}} --whitelist t --policy-eval --{{.POLICY_TARGET}} --policy-cmd {{.POLICY_CMD}} > {{.ROOT}}/out/policy-eval/out-{{.POLICY_TARGET}}
+
+  policies-summary:
+    desc: produces the policies summary only
+    cmds:
+      - (source .env/bin/activate;
+         scripts/policies.py -p {{.POLICIES}} -b kasper-phtsyscallcc | tee out/policy-eval/summary)
+
+  policies-export:
+    desc: produces the policies summary and exports reports
+    cmds:
+      - (source .env/bin/activate;
+         scripts/policies.py -p {{.POLICIES}} -b kasper-phtsyscallcc --export-reports)
+
+  policies:
+    desc: runs policy evals and produces summary
+    cmds:
+      # This could run with --parallel if it weren't for the
+      # "Cannot lock pid file: Resource temporarily unavailable" error from qemu
+      - task: policy
+        vars: {POLICY_TARGET: "specfuzz"}
+      # - task: policy
+      #   vars: {POLICY_TARGET: "spectaint"}
+      - task: policy
+        vars: {POLICY_TARGET: "kasper-phtsyscallcc"}
+      - task: policy
+        vars: {POLICY_TARGET: "kasper-phtsyscallcc-with-lvi-massaging"}
+      - task policies-summary
