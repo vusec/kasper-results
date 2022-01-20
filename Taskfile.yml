@@ -10,12 +10,15 @@ env:
   POLICIES:            'out/policy-eval'
   VMLINUX:             'out/latest/vmlinux'
 
+includes:
+  web: ./web-interface/Taskfile.yml
+
 tasks:
   setup:
     desc: run this before the rest to setup virtualenv etc
     cmds:
-        - virtualenv .env
-        - (source .env/bin/activate;
+      - virtualenv .env
+      - (source .env/bin/activate;
            pip3 install -r requirements.txt)
 
   collect-log:

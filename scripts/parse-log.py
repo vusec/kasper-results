@@ -76,9 +76,9 @@ def add_db_data(db_file, restarts, testcases):
     iterator = enumerate(restarts)
     if progressbar:
         iterator = progressbar(restarts, "Add reports", steps=1000)
-    for num, rep in iterator:
+    for num, restart in iterator:
         reports = []
-        for report in rep['reports']:
+        for report in restart['reports']:
             report, data_labels, ptr_labels = get_report_dict(report)
             if not report:
                 continue
@@ -103,7 +103,7 @@ def add_db_data(db_file, restarts, testcases):
             }
             testcases_data[testcase_id] = testcase
 
-            restart_dict, restart_stats = get_restart_dict(rep)
+            restart_dict, restart_stats = get_restart_dict(restart)
             if not restart_dict:
                 continue
             restart_dict['_id'] = num
@@ -111,7 +111,7 @@ def add_db_data(db_file, restarts, testcases):
 
             restart_dict['reports'] = reports
             restarts_data.append(restart_dict)
-            # create_row(conn, 'restart_stats', restart_stats)
+
             line_infos[restart_dict['checkpoint_func_offset']] = ''
 
             for calltrace_line in restart_dict['calltrace']:
@@ -147,6 +147,7 @@ def add_db_data(db_file, restarts, testcases):
             "ptr_labels"                : {"$addToSet":"$reports.ptr_labels"},
             "fuzzing"                   : {"$addToSet": "$reports.fuzzing" },
             "checkpoint_func_offsets"   : {"$addToSet": "$checkpoint_func_offset" },
+            "checkpoint_ips"            : {"$addToSet": "$checkpoint_ip" },
             "calltraces"                : {"$addToSet": "$calltrace" },
         } },
         { "$out": "reports" },

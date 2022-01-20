@@ -2,6 +2,14 @@
 version: '3.1'
 
 services:
+  web-interface:
+    build: web-interface
+    restart: always
+    environment:
+      MONGO_URI: mongodb://root:kasper123@db
+    ports:
+      - 5001:5001
+
   db:
     image: mongo
     restart: always

@@ -3,6 +3,10 @@
 # Python
 __pycache__
 
+# NodeJS
+node_modules
+bundle.js*
+
 # Swap
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]
