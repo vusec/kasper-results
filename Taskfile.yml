@@ -153,3 +153,9 @@ tasks:
       - task: policy
         vars: {POLICY_TARGET: "kasper-phtsyscallcc-with-lvi-massaging"}
       - task policies-summary
+
+  count-list-gadgets:
+    desc: count the number of list gadgets
+    cmds:
+      - (source .env/bin/activate;
+         scripts/count_list_gadgets.py)
