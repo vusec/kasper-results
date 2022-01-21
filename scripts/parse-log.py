@@ -56,7 +56,7 @@ def create_symlink(rundir):
         pass
     os.symlink(rundir, latest, True)
 
-def add_db_data(db_file, restarts, testcases):
+def add_db_data(rundir, restarts, testcases):
     report_num = 0
     taint_num = 0
 
@@ -68,6 +68,7 @@ def add_db_data(db_file, restarts, testcases):
     db = client.kasper
 
     # reset database
+    db.rundir.delete_many({})
     db.reports.delete_many({})
     db.line_infos.delete_many({})
     db.testcases.delete_many({})
@@ -124,6 +125,7 @@ def add_db_data(db_file, restarts, testcases):
     line_infos = [{"_id": key, "line_info": ''} for key in line_infos.keys()]
     testcases_data = [{"_id": k, "testcase": v} for (k, v) in testcases_data.items()]
 
+    db.rundir.insert_one({'rundir': rundir })
     print('insert restarts into db...')
     db.restarts.insert_many(restarts_data)
     print('insert line_infos into db...')
@@ -169,8 +171,7 @@ def main():
     copy_log(args.log_file, rundir)
     if args.write_testcases:
         write_testcases(restarts, testcases, rundir)
-    db_file = rundir + "reports.json"
-    add_db_data(db_file, restarts, testcases)
+    add_db_data(rundir, restarts, testcases)
     create_symlink(rundir)
     print('Done. Reports and log written to ' + rundir)
 

@@ -98,9 +98,15 @@ def main():
     client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=1)
     db = client.kasper
 
+    if args.vmlinux:
+        vmlinux = args.vmlinux
+    else:
+        rundir = db.rundir.find_one()['rundir']
+        vmlinux = os.path.join(rundir, 'vmlinux')
+
     cursor = db.line_infos.find({})
     documents = [document for document in cursor if document['line_info'] == '']
-    fetch_unique_func_offsets(db, documents, args.vmlinux)
+    fetch_unique_func_offsets(db, documents, vmlinux)
 
 if __name__ == "__main__":
     main()

@@ -6,6 +6,7 @@ env:
   KERNEL:              '{{.KASPERPATH}}/kdfsan-linux'
   MONGO_URI:           'mongodb://root:kasper123@localhost'
   SYZKALLER_LOGS_PATH: 'out/logs'
+  DB_DUMP:             '{{.ROOT}}/out/db.dump'
   LOGFILE:             'out/log'
   POLICIES:            'out/policy-eval'
   VMLINUX:             'out/latest/vmlinux'
@@ -38,7 +39,7 @@ tasks:
     desc: add faddr2line information for func_offsets
     cmds:
       - (source .env/bin/activate;
-         scripts/add_faddr2line.py --sym {{.VMLINUX}})
+         scripts/add_faddr2line.py)
 
   eval:
     desc: run evaluation scripts to generate necessary plots etc.
@@ -74,6 +75,40 @@ tasks:
     cmds:
       - (source .env/bin/activate;
          scripts/parse-syzkaller-bench.py --baseline {{.BASELINE}} --spec {{.SPEC}} --nr-vms={{.NR_VMS}})
+
+  clear-db:
+    desc: drop kasper database
+    cmds:
+      - docker exec -i $(docker-compose ps -q db) mongo {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.dropDatabase()"
+
+  import-db:
+    desc: import mongodb into docker container
+    vars:
+      RUNDIR:
+        sh: dirname {{.DB_DUMP}}
+      RUNDIR_OBJ: "{ rundir: \'{{.RUNDIR}}\' }"
+    cmds:
+      - task: clear-db
+      - docker cp {{.DB_DUMP}} $(docker-compose ps -q db):/data/db.dump
+      - docker exec -i $(docker-compose ps -q db) mongorestore --uri={{.MONGO_URI}} --archive=/data/db.dump
+      - docker exec -i $(docker-compose ps -q db) rm /data/db.dump
+      - docker exec -i $(docker-compose ps -q db) mongo {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.rundir.insertOne({{.RUNDIR_OBJ}})" --quiet
+
+  export-db-generic:
+    desc: export mongodb from docker container
+    cmds:
+      - docker exec -i $(docker-compose ps -q db) mongodump --uri={{.MONGO_URI}} --authenticationDatabase admin --db kasper --excludeCollection rundir --archive=/data/db.dump
+      - docker cp $(docker-compose ps -q db):/data/db.dump {{.DB_DUMP}}
+      - docker exec -i $(docker-compose ps -q db) rm /data/db.dump
+
+  export-db:
+    desc: export mongodb from docker container into rundir
+    vars:
+      RUNDIR:
+        sh: docker exec -i $(docker-compose ps -q db) mongo {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.rundir.findOne({}).rundir" --quiet
+    cmds:
+      - task: export-db-generic
+        vars: {DB_DUMP: '{{.RUNDIR}}/db.dump'}
 
   export-reports:
     desc: export reports as text file
