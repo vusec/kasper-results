@@ -15,12 +15,16 @@ includes:
   web: ./web-interface/Taskfile.yml
 
 tasks:
+  venv:run:
+    desc: Run a command inside the venv
+    cmds:
+      - VIRTUAL_ENV=.env PATH=".env/bin${PATH:+:${PATH}}" {{.CLI_ARGS}}
+
   setup:
     desc: run this before the rest to setup virtualenv etc
     cmds:
       - virtualenv .env
-      - (source .env/bin/activate;
-           pip3 install -r requirements.txt)
+      - task venv:run -- pip3 install -r requirements.txt
 
   collect-log:
     desc: combine logs from all syzkaller vms into one log file
@@ -32,26 +36,22 @@ tasks:
   parse-log:
     desc: parse log to generate reports.sqlite database for web server
     cmds:
-      - (source .env/bin/activate;
-         scripts/parse-log.py --log {{.LOGFILE}})
+      - task venv:run -- scripts/parse-log.py --log {{.LOGFILE}}
 
   add-faddr2line:
     desc: add faddr2line information for func_offsets
     cmds:
-      - (source .env/bin/activate;
-         scripts/add_faddr2line.py)
+      - task venv:run -- scripts/add_faddr2line.py
 
   eval:
     desc: run evaluation scripts to generate necessary plots etc.
     cmds:
-      - (source .env/bin/activate;
-         scripts/eval.py --nr-vms=16)
+      - task venv:run -- scripts/eval.py --nr-vms=16
 
   parse-restarts:
     desc: parse a restart statistics log
     cmds:
-      - (source .env/bin/activate;
-         scripts/parse-restart-statistics.py -s out/restart-stats/log)
+      - task venv:run -- scripts/parse-restart-statistics.py -s out/restart-stats/log
 
   restarts:
     desc: generate speculative emulation restart statistics
@@ -63,8 +63,7 @@ tasks:
   parse-inlineasm-restarts:
     desc: print line numbers of inline assembly restarts from a restart log
     cmds:
-      - (source .env/bin/activate;
-         scripts/parse-inlineasm-restarts.sh out/restart-stats/log)
+      - task venv:run -- scripts/parse-inlineasm-restarts.sh out/restart-stats/log
 
   syzkaller-coverage:
     desc: generate plot with increase of coverage over time compared to baseline
@@ -73,8 +72,7 @@ tasks:
       SPEC: '{{default "out/eval-runs/syzkaller-log-vm-10-coverage-spec" .SPEC}}'
       NR_VMS: '{{default 16 .NR_VMS}}'
     cmds:
-      - (source .env/bin/activate;
-         scripts/parse-syzkaller-bench.py --baseline {{.BASELINE}} --spec {{.SPEC}} --nr-vms={{.NR_VMS}})
+      - task venv:run -- scripts/parse-syzkaller-bench.py --baseline {{.BASELINE}} --spec {{.SPEC}} --nr-vms={{.NR_VMS}})
 
   clear-db:
     desc: drop kasper database
@@ -105,7 +103,7 @@ tasks:
     desc: export mongodb from docker container into rundir
     vars:
       RUNDIR:
-        sh: docker exec -i $(docker-compose ps -q db) mongo {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.rundir.findOne({}).rundir" --quiet
+        sh: docker exec -i $(docker-compose ps -q db) mongosh {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.rundir.findOne({}).rundir" --quiet
     cmds:
       - task: export-db-generic
         vars: {DB_DUMP: '{{.RUNDIR}}/db.dump'}
@@ -113,8 +111,7 @@ tasks:
   export-reports:
     desc: export reports as text file
     cmds:
-      - (source .env/bin/activate;
-         scripts/export-reports.py)
+      - task venv:run -- scripts/export-reports.py
 
   # Policy Eval
   policy:
@@ -130,14 +127,12 @@ tasks:
   policies-summary:
     desc: produces the policies summary only
     cmds:
-      - (source .env/bin/activate;
-         scripts/policies.py -p {{.POLICIES}} -b kasper-phtsyscallcc | tee out/policy-eval/summary)
+      - task venv:run -- scripts/policies.py -p {{.POLICIES}} -b kasper-phtsyscallcc | tee out/policy-eval/summary
 
   policies-export:
     desc: produces the policies summary and exports reports
     cmds:
-      - (source .env/bin/activate;
-         scripts/policies.py -p {{.POLICIES}} -b kasper-phtsyscallcc --export-reports)
+      - task venv:run -- scripts/policies.py -p {{.POLICIES}} -b kasper-phtsyscallcc --export-reports
 
   policies:
     desc: runs policy evals and produces summary
@@ -157,5 +152,4 @@ tasks:
   count-list-gadgets:
     desc: count the number of list gadgets
     cmds:
-      - (source .env/bin/activate;
-         scripts/count_list_gadgets.py)
+      - task venv:run -- scripts/count_list_gadgets.py

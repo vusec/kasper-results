@@ -20,6 +20,11 @@ docker-compose up
 
 ### Gadget Aggregation
 
+First setup the python virtualenv:
+```
+task setup
+```
+
 To gather a log file from a syzkaller run:
 ```
 task collect-log
