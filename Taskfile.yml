@@ -77,7 +77,7 @@ tasks:
   clear-db:
     desc: drop kasper database
     cmds:
-      - docker exec -i $(docker-compose ps -q db) mongo {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.dropDatabase()"
+      - docker exec -i $(docker-compose ps -q db) mongosh {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.dropDatabase()"
 
   import-db:
     desc: import mongodb into docker container
@@ -90,7 +90,7 @@ tasks:
       - docker cp {{.DB_DUMP}} $(docker-compose ps -q db):/data/db.dump
       - docker exec -i $(docker-compose ps -q db) mongorestore --uri={{.MONGO_URI}} --archive=/data/db.dump
       - docker exec -i $(docker-compose ps -q db) rm /data/db.dump
-      - docker exec -i $(docker-compose ps -q db) mongo {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.rundir.insertOne({{.RUNDIR_OBJ}})" --quiet
+      - docker exec -i $(docker-compose ps -q db) mongosh {{.MONGO_URI}}/kasper --authenticationDatabase admin --eval "db.rundir.insertOne({{.RUNDIR_OBJ}})" --quiet
 
   export-db-generic:
     desc: export mongodb from docker container
