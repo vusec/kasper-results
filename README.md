@@ -15,7 +15,7 @@ It is recommended to run the mongoDB database and the web interface inside docke
 
 To start the containers run:
 ```
-docker-compose up
+docker compose up
 ```
 
 ### Gadget Aggregation
@@ -51,7 +51,7 @@ Please refer to the `Taskfile.yml` for included evaluation scripts.
 
 ### Web Interface
 
-The easiest way to run the web interface is using the included `Dockerfile` together with `docker-compose`.
+The easiest way to run the web interface is using the included `Dockerfile` together with `docker compose`.
 
 Otherwise, you can setup the dependencies with:
 ```
